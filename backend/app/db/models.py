@@ -7,6 +7,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -61,6 +62,10 @@ class Candidate(Base):
         cascade="all, delete-orphan",
     )
 
+    job_skills: Mapped[list["JobSkill"]] = relationship(
+        back_populates="skill",
+        cascade="all, delete-orphan",
+    )
 
 class Resume(Base):
     __tablename__ = "resumes"
@@ -143,9 +148,16 @@ class Skill(Base):
         cascade="all, delete-orphan",
     )
 
-
 class CandidateSkill(Base):
     __tablename__ = "candidate_skills"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "candidate_id",
+            "skill_id",
+            name="uq_candidate_skill",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(
         Integer,
@@ -176,4 +188,89 @@ class CandidateSkill(Base):
 
     skill: Mapped["Skill"] = relationship(
         back_populates="candidate_skills",
+    )
+
+class Job(Base):
+    __tablename__ = "jobs"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    title: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+    company: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    description: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+    skills: Mapped[list["JobSkill"]] = relationship(
+        back_populates="job",
+        cascade="all, delete-orphan",
+    )
+
+class JobSkill(Base):
+    __tablename__ = "job_skills"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "job_id",
+            "skill_id",
+            name="uq_job_skill",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    job_id: Mapped[int] = mapped_column(
+        ForeignKey("jobs.id"),
+        nullable=False,
+        index=True,
+    )
+
+    skill_id: Mapped[int] = mapped_column(
+        ForeignKey("skills.id"),
+        nullable=False,
+        index=True,
+    )
+
+    importance: Mapped[float] = mapped_column(
+        Float,
+        default=1.0,
+        nullable=False,
+    )
+
+    job: Mapped["Job"] = relationship(
+        back_populates="skills",
+    )
+
+    skill: Mapped["Skill"] = relationship(
+        back_populates="job_skills",
     )
