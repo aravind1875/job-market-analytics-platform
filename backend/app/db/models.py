@@ -62,11 +62,6 @@ class Candidate(Base):
         cascade="all, delete-orphan",
     )
 
-    job_skills: Mapped[list["JobSkill"]] = relationship(
-        back_populates="skill",
-        cascade="all, delete-orphan",
-    )
-
 class Resume(Base):
     __tablename__ = "resumes"
 
@@ -144,6 +139,11 @@ class Skill(Base):
     )
 
     candidate_skills: Mapped[list["CandidateSkill"]] = relationship(
+        back_populates="skill",
+        cascade="all, delete-orphan",
+    )
+
+    job_skills: Mapped[list["JobSkill"]] = relationship(
         back_populates="skill",
         cascade="all, delete-orphan",
     )
