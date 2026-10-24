@@ -1,4 +1,14 @@
+
 from pydantic import BaseModel, ConfigDict
+
+
+class MatchExplanationResponse(BaseModel):
+    classification: str
+    strengths: list[str]
+    missing_skills: list[str]
+    recommendation: str
+    ats_score: float
+    semantic_score: float
 
 
 class CandidateMatchResponse(BaseModel):
@@ -21,3 +31,4 @@ class CandidateMatchResponse(BaseModel):
 
     rank: int | None = None
     reason: str | None = None
+    explanation: MatchExplanationResponse | None = None

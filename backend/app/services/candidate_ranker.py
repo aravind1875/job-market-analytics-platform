@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session, selectinload
+from app.services.match_explainer import generate_match_explanation
 
 from app.db.models import (
     Candidate,
@@ -235,25 +236,30 @@ def calculate_unified_candidate_job_score(
         + semantic_score * 0.20
     )
 
-    return {
+    result = {
         "candidate_id": candidate_id,
         "job_id": job_id,
         "overall_score": round(overall_score, 2),
         "skill_match_score": skill_score,
         "ats_score": ats_score,
         "semantic_score": semantic_score,
-        "matched_skills": skill_result[
-            "matched_skills"
-        ],
-        "missing_skills": skill_result[
-            "missing_skills"
-        ],
-        "total_required_skills": skill_result[
-            "total_required_skills"
-        ],
+        "matched_skills": skill_result["matched_skills"],
+        "missing_skills": skill_result["missing_skills"],
+        "total_required_skills": skill_result["total_required_skills"],
         "resume_id": resume.id,
         "resume_filename": resume.filename,
     }
+
+    explanation = generate_match_explanation(
+        overall_score=result["overall_score"],
+        matched_skills=result["matched_skills"],
+        missing_skills=result["missing_skills"],
+        ats_score=result["ats_score"],
+        semantic_score=result["semantic_score"],
+    )
+
+    result["explanation"] = explanation
+    return result
 
 
 def _calculate_unified_from_loaded_data(
@@ -320,25 +326,30 @@ def _calculate_unified_from_loaded_data(
         + semantic_score * 0.20
     )
 
-    return {
+    result = {
         "candidate_id": candidate.id,
         "job_id": job.id,
         "overall_score": round(overall_score, 2),
         "skill_match_score": skill_score,
         "ats_score": ats_score,
         "semantic_score": semantic_score,
-        "matched_skills": skill_result[
-            "matched_skills"
-        ],
-        "missing_skills": skill_result[
-            "missing_skills"
-        ],
-        "total_required_skills": skill_result[
-            "total_required_skills"
-        ],
+        "matched_skills": skill_result["matched_skills"],
+        "missing_skills": skill_result["missing_skills"],
+        "total_required_skills": skill_result["total_required_skills"],
         "resume_id": resume.id,
         "resume_filename": resume.filename,
     }
+
+    explanation = generate_match_explanation(
+        overall_score=result["overall_score"],
+        matched_skills=result["matched_skills"],
+        missing_skills=result["missing_skills"],
+        ats_score=result["ats_score"],
+        semantic_score=result["semantic_score"],
+    )
+
+    result["explanation"] = explanation
+    return result
 
 def rank_candidates_for_job(
     db: Session,
