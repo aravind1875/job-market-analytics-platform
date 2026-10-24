@@ -1,5 +1,6 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from app.core.logging import logger
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from app.services.match_history_service import save_match_history
@@ -130,7 +131,7 @@ def calculate_candidate_ats(
             detail=f"Resume for candidate {candidate_id} has no extracted text",
         )
 
-    
+
 
     result = calculate_ats_score(
         resume_text=resume.extracted_text,
@@ -189,6 +190,18 @@ def calculate_candidate_score(
             ) from exc
 
         raise
+
+    except Exception:
+        logger.exception(
+            "Unexpected error calculating candidate match score "
+            "(job_id=%s, candidate_id=%s)",
+            job_id,
+            candidate_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred while calculating the match score.",
+        ) from None
 
 
 @router.get(
@@ -256,6 +269,19 @@ def analyze_candidate_skill_gaps(
             ) from exc
 
         raise
+
+    except Exception:
+        logger.exception(
+            "Unexpected error analyzing candidate skill gaps "
+            "(job_id=%s, candidate_id=%s)",
+            job_id,
+            candidate_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred while analyzing skill gaps.",
+        ) from None
+
     job_skills = (
         db.query(JobSkill)
         .join(Skill, JobSkill.skill_id == Skill.id)
