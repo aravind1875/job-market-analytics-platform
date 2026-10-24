@@ -1,3 +1,4 @@
+
 from sqlalchemy.orm import Session
 
 from app.db.models import JobSkill, Skill
@@ -51,10 +52,5 @@ def extract_and_save_job_skills(
 
         db.add(job_skill)
         saved_skills.append(job_skill)
-
-    db.commit()
-
-    for job_skill in saved_skills:
-        db.refresh(job_skill)
 
     return saved_skills

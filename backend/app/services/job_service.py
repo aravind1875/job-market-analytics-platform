@@ -1,7 +1,9 @@
+
 from sqlalchemy.orm import Session
-from app.services.job_skill_service import extract_and_save_job_skills
+
 from app.db.models import Job
 from app.schemas.job import JobCreate
+from app.services.job_skill_service import extract_and_save_job_skills
 
 
 def create_job(
@@ -14,14 +16,21 @@ def create_job(
         description=job_data.description,
     )
 
-    db.add(job)
-    db.commit()
-    db.refresh(job)
+    try:
+        db.add(job)
+        db.flush()
 
-    extract_and_save_job_skills(
-        db=db,
-        job_id=job.id,
-        job_text=job.description,
-    )
-    
+        extract_and_save_job_skills(
+            db=db,
+            job_id=job.id,
+            job_text=job.description,
+        )
+
+        db.commit()
+        db.refresh(job)
+
+    except Exception:
+        db.rollback()
+        raise
+
     return job
