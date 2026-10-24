@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.schemas.matching import CandidateMatchResponse
 from app.db.database import get_db
 from app.db.models import Candidate, Job, Resume
+from fastapi import APIRouter, Depends, HTTPException, Query
 from app.services.ats_engine import calculate_ats_score
 from app.services.candidate_ranker import (
     calculate_candidate_job_match,
@@ -175,3 +176,40 @@ def calculate_candidate_score(
             ) from exc
 
         raise
+
+
+@router.get(
+    "/jobs/{job_id}/recommendations",
+    response_model=list[CandidateMatchResponse],
+)
+def recommend_candidates(
+    job_id: int,
+    limit: int = Query(default=10, ge=1, le=100),
+    min_score: float = Query(default=0, ge=0, le=100),
+    db: Session = Depends(get_db),
+):
+    job = (
+        db.query(Job)
+        .filter(Job.id == job_id)
+        .first()
+    )
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Job {job_id} does not exist",
+        )
+
+    rankings = rank_candidates_for_job(
+        db=db,
+        job_id=job_id,
+    )
+
+    recommendations = [
+        candidate
+        for candidate in rankings
+        if candidate["overall_score"] >= min_score
+        and candidate.get("resume_id") is not None
+    ]
+
+    return recommendations[:limit]
