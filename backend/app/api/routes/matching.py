@@ -306,29 +306,6 @@ def analyze_candidate_skill_gaps(
             detail="An unexpected error occurred while analyzing skill gaps.",
         ) from None
 
-    job_skills = (
-        db.query(JobSkill)
-        .join(Skill, JobSkill.skill_id == Skill.id)
-        .filter(JobSkill.job_id == job_id)
-        .all()
-    )
-
-    skill_importance = {
-        row.skill.name: row.importance
-        for row in job_skills
-    }
-    gap_analysis = generate_skill_gap_analysis(
-        matched_skills=score_result["matched_skills"],
-        missing_skills=score_result["missing_skills"],
-        skill_importance=skill_importance,
-    )
-
-    return {
-        "candidate_id": candidate_id,
-        "job_id": job_id,
-        "overall_score": score_result["overall_score"],
-        **gap_analysis,
-    }
 @router.get("/jobs/{job_id}/candidates/{candidate_id}/history")
 def get_candidate_match_history(
     job_id: int,

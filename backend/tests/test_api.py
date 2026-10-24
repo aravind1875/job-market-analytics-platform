@@ -97,3 +97,18 @@ def test_skill_gap_endpoint_hides_unexpected_error_details():
         assert "sensitive internal detail" not in response.text
     finally:
         app.dependency_overrides.clear()
+
+def test_recommendations_reject_invalid_limit():
+    response = client.get(
+        "/api/v1/matching/jobs/1/recommendations?limit=0"
+    )
+
+    assert response.status_code == 422
+
+
+def test_recommendations_reject_invalid_min_score():
+    response = client.get(
+        "/api/v1/matching/jobs/1/recommendations?min_score=101"
+    )
+
+    assert response.status_code == 422
