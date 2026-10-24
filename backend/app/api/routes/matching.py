@@ -1,15 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+
 from app.schemas.matching import CandidateMatchResponse
 from app.db.database import get_db
-from app.db.models import Candidate, Job, Resume
-from fastapi import APIRouter, Depends, HTTPException, Query
+from app.db.models import Candidate, Job, JobSkill, Resume, Skill
+from app.services.match_explainer import generate_skill_gap_analysis
 from app.services.ats_engine import calculate_ats_score
 from app.services.candidate_ranker import (
     calculate_candidate_job_match,
     calculate_unified_candidate_job_score,
     rank_candidates_for_job,
 )
+
 router = APIRouter(
     prefix="/matching",
     tags=["Matching"],
@@ -213,3 +216,56 @@ def recommend_candidates(
     ]
 
     return recommendations[:limit]
+@router.get(
+    "/jobs/{job_id}/candidates/{candidate_id}/skill-gaps"
+)
+def analyze_candidate_skill_gaps(
+    job_id: int,
+    candidate_id: int,
+    db: Session = Depends(get_db),
+):
+    try:
+        score_result = calculate_unified_candidate_job_score(
+            db=db,
+            candidate_id=candidate_id,
+            job_id=job_id,
+        )
+    except ValueError as exc:
+        message = str(exc)
+
+        if "does not exist" in message or "No resume found" in message:
+            raise HTTPException(
+                status_code=404,
+                detail=message,
+            ) from exc
+
+        if "no extracted text" in message:
+            raise HTTPException(
+                status_code=400,
+                detail=message,
+            ) from exc
+
+        raise
+    job_skills = (
+        db.query(JobSkill)
+        .join(Skill, JobSkill.skill_id == Skill.id)
+        .filter(JobSkill.job_id == job_id)
+        .all()
+    )
+
+    skill_importance = {
+        row.skill.name: row.importance
+        for row in job_skills
+    }
+    gap_analysis = generate_skill_gap_analysis(
+        matched_skills=score_result["matched_skills"],
+        missing_skills=score_result["missing_skills"],
+        skill_importance=skill_importance,
+    )
+
+    return {
+        "candidate_id": candidate_id,
+        "job_id": job_id,
+        "overall_score": score_result["overall_score"],
+        **gap_analysis,
+    }

@@ -84,3 +84,71 @@ def generate_match_explanation(
         "ats_score": ats_score,
         "semantic_score": semantic_score,
     }
+
+
+def generate_skill_gap_analysis(
+    matched_skills: list[str],
+    missing_skills: list[str],
+    skill_importance: dict[str, float] | None = None,
+) -> dict:
+    """
+    Generate actionable skill-gap suggestions, prioritizing
+    missing skills by their importance to the job.
+    """
+
+    skill_importance = skill_importance or {}
+
+    matched = sorted(
+        set(matched_skills),
+        key=str.lower,
+    )
+    missing = sorted(
+        set(missing_skills),
+        key=str.lower,
+    )
+
+    suggestions = []
+
+    for skill in missing:
+        importance = skill_importance.get(skill, 1.0)
+
+        if importance >= 2.0:
+            priority = "high"
+        elif importance >= 1.0:
+            priority = "medium"
+        else:
+            priority = "low"
+
+        suggestions.append(
+            {
+                "skill": skill,
+                "importance": importance,
+                "priority": priority,
+                "suggestion": (
+                    f"Develop practical proficiency in {skill} "
+                    "through focused study and a relevant project."
+                ),
+            }
+        )
+
+    priority_order = {
+        "high": 0,
+        "medium": 1,
+        "low": 2,
+    }
+
+    suggestions.sort(
+        key=lambda item: (
+            priority_order[item["priority"]],
+            -item["importance"],
+            item["skill"].lower(),
+        )
+    )
+
+    return {
+        "matched_skills": matched,
+        "missing_skills": missing,
+        "matched_skill_count": len(matched),
+        "missing_skill_count": len(missing),
+        "improvement_suggestions": suggestions,
+    }
