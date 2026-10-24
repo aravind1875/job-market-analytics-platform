@@ -1,3 +1,4 @@
+
 from sqlalchemy.orm import Session
 
 from app.db.models import Candidate, CandidateSkill, Skill
@@ -21,8 +22,7 @@ def extract_and_save_candidate_skills(
         )
 
     extracted_skills = extract_skills(resume_text)
-
-    candidate_skills = []
+    candidate_skills: list[CandidateSkill] = []
 
     for skill_data in extracted_skills:
         skill = (
@@ -40,7 +40,6 @@ def extract_and_save_candidate_skills(
                 normalized_name=skill_data["normalized_name"],
                 category=skill_data["category"],
             )
-
             db.add(skill)
             db.flush()
 
@@ -63,13 +62,7 @@ def extract_and_save_candidate_skills(
             skill_id=skill.id,
             confidence=skill_data["confidence"],
         )
-
         db.add(candidate_skill)
         candidate_skills.append(candidate_skill)
-
-    db.commit()
-
-    for candidate_skill in candidate_skills:
-        db.refresh(candidate_skill)
 
     return candidate_skills

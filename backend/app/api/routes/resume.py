@@ -108,7 +108,7 @@ async def upload_resume_endpoint(
             extracted_text=extracted_text,
         )
 
-        resume = create_resume(db, resume_data)
+        resume = create_resume(db, resume_data, commit=False)
 
         extract_and_save_candidate_skills(
             db=db,
@@ -116,11 +116,13 @@ async def upload_resume_endpoint(
             resume_text=extracted_text,
         )
 
+        db.commit()
+        db.refresh(resume)
+
         return resume
 
-        
-
     except ValueError as exc:
+        db.rollback()
         if file_path.exists():
             file_path.unlink()
 

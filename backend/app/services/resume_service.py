@@ -1,3 +1,4 @@
+
 from sqlalchemy.orm import Session
 
 from app.db.models import Candidate, Resume
@@ -7,6 +8,8 @@ from app.schemas.resume import ResumeCreate
 def create_resume(
     db: Session,
     resume_data: ResumeCreate,
+    *,
+    commit: bool = True,
 ) -> Resume:
     candidate = (
         db.query(Candidate)
@@ -27,7 +30,16 @@ def create_resume(
     )
 
     db.add(resume)
-    db.commit()
-    db.refresh(resume)
+
+    try:
+        db.flush()
+
+        if commit:
+            db.commit()
+            db.refresh(resume)
+
+    except Exception:
+        db.rollback()
+        raise
 
     return resume
