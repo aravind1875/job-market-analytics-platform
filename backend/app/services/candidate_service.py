@@ -1,3 +1,4 @@
+
 from sqlalchemy.orm import Session
 
 from app.db.models import Candidate
@@ -14,8 +15,12 @@ def create_candidate(
         phone=candidate_data.phone,
     )
 
-    db.add(candidate)
-    db.commit()
-    db.refresh(candidate)
+    try:
+        db.add(candidate)
+        db.commit()
+        db.refresh(candidate)
+    except Exception:
+        db.rollback()
+        raise
 
     return candidate

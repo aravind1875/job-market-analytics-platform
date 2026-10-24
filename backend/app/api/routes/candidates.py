@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.schemas.candidate import CandidateCreate, CandidateResponse
 from app.services.candidate_service import create_candidate
-from collections.abc import Generator
 
 router = APIRouter(
     prefix="/candidates",
