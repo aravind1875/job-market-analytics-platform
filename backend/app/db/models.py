@@ -5,6 +5,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -273,4 +274,72 @@ class JobSkill(Base):
 
     skill: Mapped["Skill"] = relationship(
         back_populates="job_skills",
+    )
+
+class MatchHistory(Base):
+    __tablename__ = "match_history"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("candidates.id"),
+        nullable=False,
+        index=True,
+    )
+
+    job_id: Mapped[int] = mapped_column(
+        ForeignKey("jobs.id"),
+        nullable=False,
+        index=True,
+    )
+
+    resume_id: Mapped[int | None] = mapped_column(
+        ForeignKey("resumes.id"),
+        nullable=True,
+    )
+
+    overall_score: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+    )
+
+    skill_match_score: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+    )
+
+    ats_score: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+    )
+
+    semantic_score: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+    )
+
+    classification: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+    )
+
+    matched_skills: Mapped[list[str]] = mapped_column(
+        JSON,
+        nullable=False,
+    )
+
+    missing_skills: Mapped[list[str]] = mapped_column(
+        JSON,
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+        index=True,
     )

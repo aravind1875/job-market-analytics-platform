@@ -1,10 +1,11 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-
+from sqlalchemy import desc
+from app.services.match_history_service import save_match_history
 from app.schemas.matching import CandidateMatchResponse
 from app.db.database import get_db
-from app.db.models import Candidate, Job, JobSkill, Resume, Skill
+from app.db.models import Candidate, Job, JobSkill, Resume, Skill, MatchHistory
 from app.services.match_explainer import generate_skill_gap_analysis
 from app.services.ats_engine import calculate_ats_score
 from app.services.candidate_ranker import (
@@ -145,17 +146,26 @@ def calculate_candidate_ats(
     }
 
 @router.get("/jobs/{job_id}/candidates/{candidate_id}/score")
+
 def calculate_candidate_score(
     job_id: int,
     candidate_id: int,
     db: Session = Depends(get_db),
 ):
     try:
-        return calculate_unified_candidate_job_score(
+        score_result = calculate_unified_candidate_job_score(
             db=db,
             candidate_id=candidate_id,
             job_id=job_id,
         )
+
+        history_record = save_match_history(db, score_result)
+
+        return {
+            **score_result,
+            "history_id": history_record.id,
+            "evaluated_at": history_record.created_at,
+        }
 
     except ValueError as exc:
         message = str(exc)
@@ -268,4 +278,60 @@ def analyze_candidate_skill_gaps(
         "job_id": job_id,
         "overall_score": score_result["overall_score"],
         **gap_analysis,
+    }
+@router.get("/jobs/{job_id}/candidates/{candidate_id}/history")
+def get_candidate_match_history(
+    job_id: int,
+    candidate_id: int,
+    db: Session = Depends(get_db),
+):
+    candidate = db.query(Candidate).filter(
+        Candidate.id == candidate_id
+    ).first()
+
+    if not candidate:
+        raise HTTPException(
+            status_code=404,
+            detail="Candidate not found",
+        )
+
+    job = db.query(Job).filter(
+        Job.id == job_id
+    ).first()
+
+    if not job:
+        raise HTTPException(
+            status_code=404,
+            detail="Job not found",
+        )
+
+    history = (
+        db.query(MatchHistory)
+        .filter(
+            MatchHistory.candidate_id == candidate_id,
+            MatchHistory.job_id == job_id,
+        )
+        .order_by(desc(MatchHistory.created_at))
+        .all()
+    )
+
+    return {
+        "candidate_id": candidate_id,
+        "job_id": job_id,
+        "total_evaluations": len(history),
+        "history": [
+            {
+                "history_id": record.id,
+                "overall_score": record.overall_score,
+                "skill_match_score": record.skill_match_score,
+                "ats_score": record.ats_score,
+                "semantic_score": record.semantic_score,
+                "classification": record.classification,
+                "matched_skills": record.matched_skills,
+                "missing_skills": record.missing_skills,
+                "resume_id": record.resume_id,
+                "evaluated_at": record.created_at,
+            }
+            for record in history
+        ],
     }
