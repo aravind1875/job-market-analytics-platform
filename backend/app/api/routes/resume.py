@@ -97,7 +97,6 @@ def create_resume_endpoint(
             detail=str(exc),
         ) from exc
 
-
 @router.post(
     "/upload",
     response_model=ResumeResponse,
@@ -107,6 +106,21 @@ async def upload_resume_endpoint(
     candidate_id: int = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
+):
+    try:
+        return await _upload_resume_endpoint(
+            candidate_id=candidate_id,
+            file=file,
+            db=db,
+        )
+    finally:
+        await file.close()
+
+
+async def _upload_resume_endpoint(
+    candidate_id: int,
+    file: UploadFile,
+    db: Session,
 ):
     original_filename = Path(file.filename or "").name
     extension = Path(original_filename).suffix.lower()
@@ -129,7 +143,6 @@ async def upload_resume_endpoint(
             detail=f"Candidate {candidate_id} does not exist.",
         )
 
-    # Read at most 1 byte beyond the limit to detect oversized uploads.
     contents = await file.read(MAX_UPLOAD_SIZE + 1)
 
     if len(contents) > MAX_UPLOAD_SIZE:
@@ -140,7 +153,13 @@ async def upload_resume_endpoint(
 
     validate_file_content(contents, extension)
 
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Resume upload storage is unavailable.",
+        ) from exc
 
     stored_filename = f"{uuid4().hex}{extension}"
     file_path = UPLOAD_DIR / stored_filename
@@ -153,7 +172,10 @@ async def upload_resume_endpoint(
         except Exception as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="The uploaded document could not be parsed. Please upload a valid PDF or DOCX file.",
+                detail=(
+                    "The uploaded document could not be parsed. "
+                    "Please upload a valid PDF or DOCX file."
+                ),
             ) from exc
 
         resume_data = ResumeCreate(
@@ -163,7 +185,6 @@ async def upload_resume_endpoint(
             extracted_text=extracted_text,
         )
 
-        # Keep resume and extracted skills in the same transaction.
         resume = create_resume(db, resume_data, commit=False)
 
         extract_and_save_candidate_skills(
@@ -188,7 +209,7 @@ async def upload_resume_endpoint(
 
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
+            detail="Resume processing failed due to invalid input.",
         ) from exc
 
     except Exception as exc:

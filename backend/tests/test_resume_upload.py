@@ -34,6 +34,48 @@ def upload_context(tmp_path):
             yield mock_db, tmp_path / "uploads"
         finally:
             app.dependency_overrides.pop(get_db, None)
+def test_upload_closes_file_when_extension_is_invalid(upload_context):
+    import asyncio
+    from io import BytesIO
+
+    from fastapi import HTTPException
+    from starlette.datastructures import UploadFile as StarletteUploadFile
+
+    from app.api.routes.resume import upload_resume_endpoint
+
+    mock_db, _ = upload_context
+
+    mock_upload = StarletteUploadFile(
+        filename="resume.txt",
+        file=BytesIO(b"invalid content"),
+    )
+
+    original_close = mock_upload.close
+    close_called = False
+
+    async def tracked_close():
+        nonlocal close_called
+        close_called = True
+        await original_close()
+
+    mock_upload.close = tracked_close
+
+    try:
+        with pytest.raises(HTTPException) as exc_info:
+            asyncio.run(
+                upload_resume_endpoint(
+                    candidate_id=1,
+                    file=mock_upload,
+                    db=mock_db,
+                )
+            )
+
+        assert exc_info.value.status_code == 400
+        assert close_called
+        assert mock_upload.file.closed
+    finally:
+        if not mock_upload.file.closed:
+            asyncio.run(mock_upload.close())
 
 
 def test_upload_rejects_unsupported_extension(upload_context):
@@ -225,3 +267,31 @@ def test_upload_success_commits_and_returns_resume(
     stored_files = list(upload_dir.iterdir())
     assert len(stored_files) == 1
     assert stored_files[0].suffix == ".pdf"
+
+def test_upload_returns_safe_error_when_upload_directory_fails(
+    upload_context,
+):
+    _, upload_dir = upload_context
+
+    with patch(
+        "app.api.routes.resume.Path.mkdir",
+        side_effect=OSError("internal filesystem details"),
+    ):
+        response = client.post(
+            UPLOAD_URL,
+            data={"candidate_id": "1"},
+            files={
+                "file": (
+                    "resume.pdf",
+                    b"%PDF-test",
+                    "application/pdf",
+                )
+            },
+        )
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == (
+        "Resume upload storage is unavailable."
+    )
+    assert "internal filesystem details" not in response.text
+    assert not upload_dir.exists()
